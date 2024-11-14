@@ -13,6 +13,20 @@ git clone  https://github.com/takaniwa/DSNet.git
 ## News 2024/7/28
 We extended the MSAF and MSA experiments for classification by applying them to models like ResNet18. On the ImageNet1K task, this led to a 3.3% accuracy improvement with only a 1% increase in computational cost! We will include a more detailed explanation of this module in our paper for submission to a high-quality journal.
 
+
+Performance of MSA and MSAF on ResNet. "Insert" represents applying the module after the feature fusion of BasicBlock, and "Fusion" represents using MSAF or the AFF series for feature fusion. r stands for channel compression multiplier. The GFLOPs is measured at 256 x 3 x 224 x 224.
+| Method       | Type   | Model   | r   | #Params | #GFLOPs | Top1. acc(%) |
+|:-------------:|:------:|:-------:|:---:|:-------:|:-------:|:------------:|
+| Add           | None   | ResNet18| -   | 11.7    | 434.9   | 69.7         |
+| Add           | None   | ResNet34| -   | 21.8    | 877.1   | 72.9         |
+| SE            | Insert | ResNet18| 16  | 11.8    | 435.1   | 71.2         |
+| MSA(Ours)     | Insert | ResNet18| 16  | 12.1    | 441.1   | **72.2**         |
+| MSA(Ours)     | Insert | ResNet18| 4   | 13.1    | 455.5   | **72.9**        |
+| AFF           | Fusion | ResNet18| 4   | 12.4    | 448.3   | 72.0         |
+| iAFF          | Fusion | ResNet18| 4   | 12.8    | 461.7   | 60.2         |
+| MSAF(Ours)    | Fusion | ResNet18| 16  | 12.1    | 441.1   | **72.3**         |
+| MSAF(Ours)    | Fusion | ResNet18| 4   | 13.1    | 455.5   | **73.2**         |
+
 ## **Environment**: 
 PyTorch 1.10 
 
