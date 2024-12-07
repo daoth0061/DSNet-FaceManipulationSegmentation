@@ -135,3 +135,14 @@ python DSNet/models/speed/dsnet_speed.py
 
   Cityscapes: 80.4%mIOU:[google drive](https://drive.google.com/file/d/1UmG7qaMz9BXR4hXxvIoJJ9k_N9JVuUQy/view?usp=sharing)
 
+### Citation:
+
+```
+@article{guo2024dsnet,
+  title={DSNet: A Novel Way to Use Atrous Convolutions in Semantic Segmentation},
+  author={Guo, Zilu and Bian, Liuyang and Wei, Hu and Li, Jingyu and Ni, Huasheng and Huang, Xuan},
+  journal={IEEE Transactions on Circuits and Systems for Video Technology},
+  year={2024},
+  publisher={IEEE}
+}
+```
