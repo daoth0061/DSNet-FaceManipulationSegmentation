@@ -9,3 +9,4 @@ from .mapillary import Mapillary as mapillary
 from .cocostuff import COCOStuff as cocostuff
 from .bdd10k import BDD as bdd
 from .ade20k import ADE20K as ade20k
+from .attgan import AttGAN as attgan
