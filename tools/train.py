@@ -34,7 +34,7 @@ def parse_args():
     
     parser.add_argument('--cfg',
                         help='experiment configure file name',
-                        default="/root/autodl-tmp/DSNet/configs/ade20k/ds_ade20k_train.yaml",
+                        default="/kaggle/input/configs/FaceManipulationDetection/AttGAN/ds_base_attgan.yaml",
                         type=str)
     parser.add_argument('--seed', type=int, default=304)    
     parser.add_argument("--local_rank", type=int, default=-1)       
@@ -60,6 +60,8 @@ def get_sampler(dataset):
 
 
 def main():
+
+    #Fix seed
     args = parse_args()
     # torch.autograd.set_detect_anomaly(True)
     if args.seed > 0:
@@ -68,6 +70,7 @@ def main():
         random.seed(args.seed)
         torch.manual_seed(args.seed)        
 
+    #Set up log
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'dsnet_m')
 
@@ -85,7 +88,7 @@ def main():
     cudnn.deterministic = config.CUDNN.DETERMINISTIC
     cudnn.enabled = config.CUDNN.ENABLED
 
-
+    # Set up GPUs
     gpus = list(config.GPUS)
 
 
@@ -106,14 +109,9 @@ def main():
         )  
         # return 0
 
-#     imgnet = 'imagenet' in config.MODEL.PRETRAINED
-    model = models.dsnet.get_seg_model(config, imgnet_pretrained=True)
-    # print(model)
-    # model = models.dsnet.get_pred_model("", num_classes=config.DATASET.NUM_CLASSES)
-
     print(final_output_dir)
     if distributed and args.local_rank == 0:
-        this_dir = os.path.dirname(__file__)
+        this_dir = os.path.dirname(os.getcwd())
         models_dst_dir = os.path.join(final_output_dir, 'models')
         if os.path.exists(models_dst_dir):
             shutil.rmtree(models_dst_dir)
@@ -126,18 +124,30 @@ def main():
         batch_size = config.TRAIN.BATCH_SIZE_PER_GPU * len(gpus)   
 
     # batch_size = config.TRAIN.BATCH_SIZE_PER_GPU * len(gpus)
-    # prepare data
-    crop_size = (config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
-    train_dataset = eval('datasets.'+config.DATASET.DATASET)(
-                        root=config.DATASET.ROOT,
-                        list_path=config.DATASET.TRAIN_SET,
-                        num_classes=config.DATASET.NUM_CLASSES,
-                        multi_scale=config.TRAIN.MULTI_SCALE,
-                        flip=config.TRAIN.FLIP,
-                        ignore_label=config.TRAIN.IGNORE_LABEL,
-                        base_size=config.TRAIN.BASE_SIZE,
-                        crop_size=crop_size,
-                        scale_factor=config.TRAIN.SCALE_FACTOR)
+
+    # Define paths
+    fake_dir = '/kaggle/input/dataset-attrgan/fake_attrGAN/fake_attrGAN'
+    real_dir = '/kaggle/input/dataset-attrgan/real-20250326T031740Z-001/real'
+    mask_dir = '/kaggle/input/masked-dataset-newversion/mask'
+    filtered_images_path = '/kaggle/input/attgan-filtering/evaluation_results/images_threshold_0.95.txt'
+    
+    # Create datasets
+    full_dataset = eval('datasets.'+config.DATASET.DATASET)(
+        fake_dir=fake_dir,
+        real_dir=real_dir,
+        mask_dir=mask_dir,
+        filtered_images_path=filtered_images_path,
+        split='train'
+    )
+
+    # Split into train/val/test
+    train_size = int(0.7 * len(full_dataset))
+    val_size = int(0.15 * len(full_dataset))
+    test_size = len(full_dataset) - train_size - val_size
+    
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
+        full_dataset, [train_size, val_size, test_size]
+    )
 
     train_sampler = get_sampler(train_dataset)
 
@@ -149,18 +159,17 @@ def main():
         pin_memory=True,
         drop_last=True,
         sampler = train_sampler)
+    
+    val_sampler = get_sampler(val_dataset)
 
+    valloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
+        shuffle=False,
+        num_workers=config.WORKERS,
+        pin_memory=True,
+        sampler=val_sampler)
 
-    test_size = (config.TEST.IMAGE_SIZE[1], config.TEST.IMAGE_SIZE[0])
-    test_dataset = eval('datasets.'+config.DATASET.DATASET)(
-                        root=config.DATASET.ROOT,
-                        list_path=config.DATASET.TEST_SET,
-                        num_classes=config.DATASET.NUM_CLASSES,
-                        multi_scale=config.TEST.MULTI_SCALE,
-                        flip=False,
-                        ignore_label=config.TRAIN.IGNORE_LABEL,
-                        base_size=config.TEST.BASE_SIZE,
-                        crop_size=test_size)
     test_sampler = get_sampler(test_dataset)
 
     testloader = torch.utils.data.DataLoader(
@@ -170,29 +179,17 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True,
         sampler=test_sampler)
-
-    # criterion
-    if config.LOSS.USE_OHEM:
-        sem_criterion = OhemCrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
-                                        thres=config.LOSS.OHEMTHRES,
-                                        min_kept=config.LOSS.OHEMKEEP,
-                                        weight=train_dataset.class_weights)
-        ce_criterion = CrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
-                                    weight=train_dataset.class_weights)
-    else:
-        sem_criterion = CrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
-                                    weight=train_dataset.class_weights)
+    
 
 
-    model = FullModel(model, sem_criterion, ce_criterion)
+    # Create model
+    model = models.dsnet.get_seg_model(config, imgnet_pretrained=True)
 
     if distributed:
         model = model.to(device)
-#         if SyncBatchNorm
-        # 使用 SyncBatchNorm 
+
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
-        # 将模型封装为 DistributedDataParallel
         model = torch.nn.parallel.DistributedDataParallel(
             model,
             find_unused_parameters=True,
@@ -202,40 +199,29 @@ def main():
     else:
         model = nn.DataParallel(model, device_ids=gpus).cuda()
 
-    # optimizer
-    if config.TRAIN.OPTIMIZER == 'sgd':
-        params_dict = dict(model.named_parameters())
-        params = [{'params': list(params_dict.values()), 'lr': config.TRAIN.LR}]
-
-        optimizer = torch.optim.SGD(params,
-                                lr=config.TRAIN.LR,
-                                momentum=config.TRAIN.MOMENTUM,
-                                weight_decay=config.TRAIN.WD,
-                                nesterov=config.TRAIN.NESTEROV,
-                                )
+    # # optimizer
+    if config.TRAIN.OPTIMIZER == 'Adam':
+        optimizer = optim.Adam(model.parameters(), 
+                           lr=config.TRAIN.LR,
+                           weight_decay=config.TRAIN.WD)
     else:
-        
-        raise ValueError('Only Support SGD optimizer')
-    # 定义Adam优化器，并传入模型参数和学习率
-#     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    # optimizer = torch.optim.Adadelta(model.parameters(), rho=0.9, eps=1e-8)
+        raise ValueError('Only Support Adam optimizer')
 
 
-    epoch_iters = np.int64(train_dataset.__len__() / config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
+
+    epoch_iters = np.int64(len(train_dataset) / config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
     
-
-
-    best_mIoU = 0
-    mean_IoU = 0
+    best_loss = float('inf')  # Track best loss instead of mIoU
+    mean_loss = 0
     last_epoch = config.TRAIN.BEGIN_EPOCH
     valid_loss = 0
     flag_rm = config.TRAIN.RESUME
-    
+
     if config.TRAIN.RESUME:
         model_state_file = os.path.join(config.MODEL.PRETRAINED)
         if os.path.isfile(model_state_file):
             checkpoint = torch.load(model_state_file, map_location={'cuda:0': 'cpu'})
-            best_mIoU = checkpoint['best_mIoU']
+            best_loss = checkpoint.get('best_loss', float('inf'))  # Get best_loss instead of best_mIoU
             last_epoch = checkpoint['epoch']
             dct = checkpoint['state_dict']
             
@@ -245,79 +231,81 @@ def main():
         if distributed:
             torch.distributed.barrier()
 
-    # last_epoch = 0
     start = timeit.default_timer()
     end_epoch = config.TRAIN.END_EPOCH
     num_iters = config.TRAIN.END_EPOCH * epoch_iters
-    # real_end = 120+1 if 'camvid' in config.DATASET.TRAIN_SET else end_epoch
     real_end = end_epoch
     base_lr = config.TRAIN.LR
-    for epoch in range(last_epoch, real_end):
 
+    for epoch in range(last_epoch, real_end):
         current_trainloader = trainloader
         if current_trainloader.sampler is not None and hasattr(current_trainloader.sampler, 'set_epoch'):
             current_trainloader.sampler.set_epoch(epoch)
 
-
-
+        # Call existing train function, assuming it now properly calculates BCE loss
         train(config, epoch, config.TRAIN.END_EPOCH, 
-                  epoch_iters, base_lr, num_iters,
-                  trainloader, optimizer, model, writer_dict)
+                epoch_iters, base_lr, num_iters,
+                trainloader, optimizer, model, writer_dict)
 
-        if flag_rm == 1 or (epoch % 2 == 0 and epoch <= 50)  or (epoch % 20 == 0 and epoch > 50 and epoch <= 180)  or (epoch>180 and epoch % 2 == 0) and (epoch>235): 
-            valid_loss, mean_IoU, IoU_array = validate(config, 
-                        testloader, model, writer_dict)
+        # Validation check at specified intervals
+        if flag_rm == 1 or (epoch % 2 == 0 and epoch <= 50) or (epoch % 20 == 0 and epoch > 50 and epoch <= 180) or (epoch > 180 and epoch % 2 == 0) or (epoch > 235): 
+            # Modify validate function to return only BCE loss, not mIoU
+            valid_loss = validate(config, testloader, model, writer_dict)
 
         if flag_rm == 1:
             flag_rm = 0
+        
         if args.local_rank <= 0:
+        
+            # Save best model based on loss instead of mIoU
+            if valid_loss < best_loss:
+                best_loss = valid_loss
+                torch.save(model.module.state_dict(),
+                        os.path.join(final_output_dir, 'best_dsnet_face.pth'))
+                torch.save(model.module.state_dict(),
+                        os.path.join(final_output_dir, 'best_dsnet_face.pt'))
+                
+                # # Save additional checkpoints for particularly good models
+                # if best_loss < 0.10:  # Example threshold, adjust as needed
+                #     torch.save(model.module.state_dict(),
+                #         os.path.join(final_output_dir, 'best_dsnet_face_{:.6f}.pth'.format(best_loss)))
+
+                #     torch.save({
+                #     'epoch': epoch+1,
+                #     'best_loss': best_loss,
+                #     'state_dict': model.module.state_dict(),
+                #     'optimizer': optimizer.state_dict(),
+                #     }, os.path.join(final_output_dir,'best_dsnet_face_{:.6f}.pth.tar'.format(best_loss)))
+                # else:
+                #     torch.save({
+                #     'epoch': epoch+1,
+                #     'best_loss': best_loss,
+                #     'state_dict': model.module.state_dict(),
+                #     'optimizer': optimizer.state_dict(),
+                #     }, os.path.join(final_output_dir,'best_dsnet_face.pth.tar'))
             logger.info('=> saving checkpoint to {}'.format(
-                final_output_dir + 'checkpoint_dhs_base_bdd.pth.tar'))
+                final_output_dir + 'checkpoint_dsnet_face.pth.tar'))
             torch.save({
                 'epoch': epoch+1,
-                'best_mIoU': best_mIoU,
+                'best_loss': best_loss,  # Save best_loss instead of best_mIoU
                 'state_dict': model.module.state_dict(),
                 'optimizer': optimizer.state_dict(),
-            }, os.path.join(final_output_dir,'checkpoint_dhs_base_bdd.pth.tar'))
-            if mean_IoU > best_mIoU:
-                best_mIoU = mean_IoU
-                torch.save(model.module.state_dict(),
-                        os.path.join(final_output_dir, 'best_dhs_base_bdd.pth'))
-                torch.save(model.module.state_dict(),
-                        os.path.join(final_output_dir, 'best_dhs_base_bdd.pt'))
-                if best_mIoU > 0.620:
-                    torch.save(model.module.state_dict(),
-                        os.path.join(final_output_dir, 'best_dhs_base_bdd_{: .6f}.pth'.format(best_mIoU)))
-
-                    torch.save({
-                    'epoch': epoch+1,
-                    'best_mIoU': best_mIoU,
-                    'state_dict': model.module.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    }, os.path.join(final_output_dir,'best_dhs_base_bdd_{: .6f}.pth.tar'.format(best_mIoU)))
-                else :
-                    torch.save({
-                    'epoch': epoch+1,
-                    'best_mIoU': best_mIoU,
-                    'state_dict': model.module.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    }, os.path.join(final_output_dir,'best_dhs_base_bdd.pth.tar'))
-            msg = 'Loss: {:.3f}, MeanIU: {: 4.4f}, Best_mIoU: {: 4.4f}'.format(
-                        valid_loss, mean_IoU, best_mIoU)
+            }, os.path.join(final_output_dir,'checkpoint_dsnet_face.pth.tar'))
+            
+            # Log BCE loss instead of mIoU
+            msg = 'Loss: {:.3f}, Valid Loss: {:.4f}, Best Loss: {:.4f}'.format(
+                        0.0, valid_loss, best_loss)  # Train loss placeholder
             logging.info(msg)
 
-
-
-
     if args.local_rank <= 0:
-
         torch.save(model.module.state_dict(),
-                os.path.join(final_output_dir, 'final_dhs_base_bdd.pt'))
+                os.path.join(final_output_dir, 'final_dsnet_face.pt'))
 
         writer_dict['writer'].close()
         end = timeit.default_timer()
         logger.info('Hours: %d' % int((end-start)/3600))
         logger.info('Done')
-
 if __name__ == '__main__':
     main()
+
+   

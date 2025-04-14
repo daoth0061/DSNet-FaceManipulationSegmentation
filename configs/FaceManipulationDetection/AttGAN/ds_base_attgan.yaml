@@ -2,18 +2,18 @@ CUDNN:
   BENCHMARK: true
   DETERMINISTIC: false
   ENABLED: true
-GPUS: (0,1,2,3)
+GPUS: (0,1)
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
-WORKERS: 4
-PRINT_FREQ: 50
+WORKERS: 2
+PRINT_FREQ: 25
 
 DATASET:
-  DATASET: ade20k
-  ROOT: "/root/autodl-tmp/DSNet/data/"
-  TEST_SET: 'list/ade20k/val.lst'
-  TRAIN_SET: 'list/ade20k/train.lst'
-  NUM_CLASSES: 150
+  DATASET: attgan
+  ROOT: "/kaggle/input/DSNet/data/"
+  TEST_SET: 'list/attgan/val.lst'
+  TRAIN_SET: 'list/attgan/train.lst'
+  NUM_CLASSES: 1
 MODEL:
   NAME: 'dsnet_m'
   NUM_OUTPUTS: 3

@@ -37,12 +37,7 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
 
     batch_time = AverageMeter()
     ave_loss = AverageMeter()
-    ave_acc  = AverageMeter()
-    avg_sem_loss1 = AverageMeter()
-    avg_sem_loss2 = AverageMeter()
-    avg_sem_loss3 = AverageMeter()
-    boundary_loss = AverageMeter()
-    avg_bce_loss = AverageMeter()
+    avg_bce_loss = AverageMeter()  # Add this for BCE loss tracking
 
     tic = time.time()
     cur_iters = epoch*epoch_iters
