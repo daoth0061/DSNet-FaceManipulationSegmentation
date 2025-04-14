@@ -37,7 +37,7 @@ def parse_args():
                         default="/kaggle/working/DSNet-FaceManipulationSegmentation/configs/FaceManipulationDetection/AttGAN/ds_base_attgan.yaml",
                         type=str)
     parser.add_argument('--seed', type=int, default=304)    
-    parser.add_argument("--local_rank", type=int, default=-1)       
+    # parser.add_argument("--local_rank", type=int, default=-1)       
 
     parser.add_argument('opts',
                         help="Modify config options using the command-line",
@@ -45,6 +45,7 @@ def parse_args():
                         nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
+    args.local_rank = int(os.environ.get('LOCAL_RANK', -1))
     update_config(config, args)
 
     return args
