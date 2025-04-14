@@ -29,6 +29,8 @@ _C.CUDNN.ENABLED = True
 _C.MODEL = CN()
 _C.MODEL.NAME = 'pidnet_s'
 _C.MODEL.PRETRAINED = 'pretrained_models/imagenet/PIDNet_S_ImageNet.pth.tar'
+_C.MODEL.PRETRAINED_IMAGENET = '/kaggle/working/DSNet-FaceManipulationSegmentation/pretrained_models/imagenet/dhsnet_catnormal_wider_93.pth'
+_C.MODEL.AUGMENT = False
 _C.MODEL.ALIGN_CORNERS = True
 _C.MODEL.NUM_OUTPUTS = 2
 
