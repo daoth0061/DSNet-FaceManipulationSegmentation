@@ -212,17 +212,17 @@ class DSNet(nn.Module):
 def get_seg_model(cfg, imgnet_pretrained):
     if 's' in cfg.MODEL.NAME:
         if cfg.MODEL.NAME == 'dsnet_head128':
-            model = DSNet(m=2, n=2, num_classes=cfg.DATASET.NUM_CLASSES, planes=32, name='s128', augment=True)
+            model = DSNet(m=2, n=2, num_classes=cfg.DATASET.NUM_CLASSES, planes=32, name='s128', augment=cfg.MODEL.AUGMENT)
         if cfg.MODEL.NAME == 'dsnet_head64':
-            model = DSNet(m=2, n=2, num_classes=cfg.DATASET.NUM_CLASSES, planes=32, name='s64', augment=True)
+            model = DSNet(m=2, n=2, num_classes=cfg.DATASET.NUM_CLASSES, planes=32, name='s64', augment=cfg.MODEL.AUGMENT)
         if cfg.MODEL.NAME == 'dsnet_head256':
-            model = DSNet(m=2, n=2, num_classes=cfg.DATASET.NUM_CLASSES, planes=32, name='s256', augment=True)            
+            model = DSNet(m=2, n=2, num_classes=cfg.DATASET.NUM_CLASSES, planes=32, name='s256', augment=cfg.MODEL.AUGMENT)            
     if 'm' in cfg.MODEL.NAME:
-        model = DSNet(m=2, n=3, num_classes=cfg.DATASET.NUM_CLASSES, planes=64, name='m',augment=True)
+        model = DSNet(m=2, n=3, num_classes=cfg.DATASET.NUM_CLASSES, planes=64, name='m',augment=cfg.MODEL.AUGMENT)
 
     print(model)
     if imgnet_pretrained:
-        pretrained_path = '/root/autodl-tmp/DSNet/pretrained_models/imagenet/dhsnet_catnormal_wider_93.pth'
+        pretrained_path = cfg.MODEL.PRETRAINED_IMAGENET
         if not os.path.exists(pretrained_path):
             print(f"Error: File not found at {pretrained_path}")
         pretrained_state = torch.load(pretrained_path, map_location='cpu')['state_dict']
@@ -244,7 +244,7 @@ def get_seg_model(cfg, imgnet_pretrained):
         logging.info(msg)
         logging.info('Over!!!')
         model.load_state_dict(model_dict, strict=False)
-    else:
+    elif cfg.MODEL.PRETRAINED:
         pretrained_dict = torch.load(cfg.MODEL.PRETRAINED, map_location='cpu')
         print("11111")
         if 'state_dict' in pretrained_dict:

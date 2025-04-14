@@ -3,53 +3,55 @@ CUDNN:
   DETERMINISTIC: false
   ENABLED: true
 GPUS: (0,1)
-OUTPUT_DIR: 'output'
-LOG_DIR: 'log'
+OUTPUT_DIR: '/kaggle/working/output'
+LOG_DIR: '/kaggle/working/log'
 WORKERS: 2
 PRINT_FREQ: 25
 
 DATASET:
   DATASET: attgan
-  ROOT: "/kaggle/input/DSNet/data/"
-  TEST_SET: 'list/attgan/val.lst'
-  TRAIN_SET: 'list/attgan/train.lst'
+  # ROOT: "/kaggle/input/DSNet/data/"
+  # TEST_SET: 'list/attgan/val.lst'
+  # TRAIN_SET: 'list/attgan/train.lst'
   NUM_CLASSES: 1
-MODEL:
-  NAME: 'dsnet_m'
-  NUM_OUTPUTS: 3
-  PRETRAINED: ""
-LOSS:
-  USE_OHEM: true
-  OHEMTHRES: 0.9
-  OHEMKEEP: 131072
-  BALANCE_WEIGHTS: [0.4, 1.0]
-  SB_WEIGHTS: 1.0
+
 TRAIN:
   IMAGE_SIZE:
-  - 512
-  - 512
-  BASE_SIZE: 512
+  - 256
+  - 256
+  BASE_SIZE: 256
   BATCH_SIZE_PER_GPU: 8
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 253
   RESUME: false
-  OPTIMIZER: sgd
-  LR: 0.01
-  WD: 0.0001
-  MOMENTUM: 0.9
-  NESTEROV: false
-  FLIP: true
-  MULTI_SCALE: true
-  IGNORE_LABEL: 255
-  SCALE_FACTOR: 13
+  OPTIMIZER: Adam
+  LR: 1e-4
+  WD: 5e-4
+  # FLIP: true
+  # MULTI_SCALE: true
+  # IGNORE_LABEL: 255
+  # SCALE_FACTOR: 13
 TEST:
   IMAGE_SIZE:
-  - 512
-  - 512
-  BASE_SIZE: 512
+  - 256
+  - 256
+  BASE_SIZE: 256
   BATCH_SIZE_PER_GPU: 4
   FLIP_TEST: false
   MULTI_SCALE: false 
   MODEL_FILE: ''
   OUTPUT_INDEX: 1
+
+MODEL:
+  NAME: 'dsnet_m'
+  # NUM_OUTPUTS: 3
+  PRETRAINED: ''
+  PRETRAINED_IMAGENET: '/kaggle/working/DSNet-FaceManipulationSegmentation/pretrained_models/imagenet/dhsnet_catnormal_wider_93.pth'
+  AUGMENT: false
+# LOSS:
+#   USE_OHEM: true
+#   OHEMTHRES: 0.9
+#   OHEMKEEP: 131072
+#   BALANCE_WEIGHTS: [0.4, 1.0]
+#   SB_WEIGHTS: 1.0

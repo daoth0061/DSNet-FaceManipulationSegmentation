@@ -43,125 +43,90 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
     cur_iters = epoch*epoch_iters
     writer = writer_dict['writer']
     global_steps = writer_dict['train_global_steps']
-    record = []
-    for i_iter, batch in enumerate(trainloader, 0):
-        images, labels, _, _ = batch
+
+    for i_iter, batch in enumerate(trainloader):
+        # For face manipulation data, we expect images and masks
+        images, masks = batch['image'], batch['mask']  # Modified to get mask instead of labels
         images = images.cuda()
-        labels = labels.long().cuda()
+        masks = masks.float().cuda()  # Ensure masks are float for BCE loss
         
-
-        losses, outputs, acc, loss_list = model(images, labels)
-        loss = losses.mean()
-        acc  = acc.mean()
-
+        # Forward pass to get probability outputs
+        outputs = model(images)
+        
+        # Apply sigmoid to get probabilities in [0,1] range
+        outputs = torch.sigmoid(outputs)
+        
+        # Calculate BCE loss
+        loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+        
         if dist.is_distributed():
             reduced_loss = reduce_tensor(loss)
         else:
             reduced_loss = loss
 
+        # Backward and optimize
         model.zero_grad()
         loss.backward()
         optimizer.step()
-        # scheduler.step()
-        # measure elapsed time
+        
+        # Measure elapsed time
         batch_time.update(time.time() - tic)
         tic = time.time()
 
-        # update average loss
-        ave_loss.update(reduced_loss.item())
-        ave_acc.update(acc.item())
+        # Update average loss
+        avg_bce_loss.update(reduced_loss.item())
 
-        avg_sem_loss1.update(loss_list[0].mean().item())   # 最终图像的loss
-        avg_sem_loss2.update(loss_list[1].mean().item())   # 第一个监督信号
-        avg_sem_loss3.update(loss_list[2].mean().item())   # 第二个监督信号
-        boundary_loss.update(loss_list[3].mean().item())   # 第三个监督信号
-
+        # Adjust learning rate
         lr = adjust_learning_rate(optimizer,
-                                  base_lr,
-                                  num_iters,
-                                  i_iter+cur_iters)
+                              base_lr,
+                              num_iters,
+                              i_iter+cur_iters)
+                              
+        # Print progress
         if i_iter % config.PRINT_FREQ == 0 and dist.get_rank() == 0:
             msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
-                  'lr: {}, Loss: {:.6f}, Acc:{:.6f}, Semantic loss: {:.6f}, loss1: {:.6f}, loss2: {:.6f}, SB loss: {:.6f}' .format(
+                  'lr: {}, BCE Loss: {:.6f}' .format(
                       epoch, num_epoch, i_iter, epoch_iters,
-                      batch_time.average(), [x['lr'] for x in optimizer.param_groups], ave_loss.average(),
-                      ave_acc.average(), avg_sem_loss1.average(), avg_sem_loss2.average(), avg_sem_loss3.average(), boundary_loss.average())
+                      batch_time.average(), [x['lr'] for x in optimizer.param_groups], 
+                      avg_bce_loss.average())
             logging.info(msg)
 
-        record.append(loss)
-
-
-
-    
-    writer.add_scalar('train_loss', ave_loss.average(), global_steps)
+    # Log to tensorboard
+    writer.add_scalar('train_bce_loss', avg_bce_loss.average(), global_steps)
     writer_dict['train_global_steps'] = global_steps + 1
+
 
 def validate(config, testloader, model, writer_dict):
     model.eval()
     ave_loss = AverageMeter()
-    pixel_acc = 0
-    nums = config.MODEL.NUM_OUTPUTS
-    confusion_matrix = np.zeros(
-        (config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES))
-    confusion_matrix2 = np.zeros(
-        (config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES))
-    mean_loss = 0
+    
     with torch.no_grad():
         for idx, batch in enumerate(testloader):
-            image, label, _, _ = batch
-            size = label.size()
-            image = image.cuda()
-            label = label.long().cuda()
-            # bd_gts = bd_gts.float().cuda()
-
-            losses, pred, _, _ = model(image, label)
-            # pred[] = pred[1]
-            if not isinstance(pred, (list, tuple)):
-                pred = [pred]   # 直接跳过
-
-            confusion_matrix += get_confusion_matrix(
-                label,
-                pred[1],
-                size,
-                config.DATASET.NUM_CLASSES,
-                config.TRAIN.IGNORE_LABEL
-            )
-
-
-
-            loss = losses.mean()
+            images, masks = batch['image'], batch['mask']
+            images = images.cuda()
+            masks = masks.float().cuda()  # Ensure mask is float for BCE loss
+            
+            # Forward pass
+            outputs = model(images)
+            outputs = torch.sigmoid(outputs)
+            
+            # Calculate BCE loss
+            loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+            
             if dist.is_distributed():
                 reduced_loss = reduce_tensor(loss)
             else:
                 reduced_loss = loss
+                
             ave_loss.update(reduced_loss.item())
 
-
-    if dist.is_distributed():
-        confusion_matrix = torch.from_numpy(confusion_matrix).cuda()
-        reduced_confusion_matrix = reduce_tensor(confusion_matrix)
-        confusion_matrix = reduced_confusion_matrix.cpu().numpy()
-        
-
-
-    pos = confusion_matrix.sum(1)
-    res = confusion_matrix.sum(0)
-    tp = np.diag(confusion_matrix)
-    pixel_acc = tp.sum()/pos.sum()
-    IoU_array = (tp / np.maximum(1.0, pos + res - tp))
-    mean_IoU = IoU_array.mean()
-
-    if dist.get_rank() <= 0:
-        logging.info('acc:{} '.format(pixel_acc))
-        logging.info('{} {}'.format(IoU_array, mean_IoU))
-
+    # Log to tensorboard
     writer = writer_dict['writer']
     global_steps = writer_dict['valid_global_steps']
-    writer.add_scalar('valid_loss', ave_loss.average(), global_steps)
-    writer.add_scalar('valid_mIoU', mean_IoU, global_steps)
-    writer.add_scalar('acc', pixel_acc, global_steps)
+    writer.add_scalar('valid_bce_loss', ave_loss.average(), global_steps)
     writer_dict['valid_global_steps'] = global_steps + 1
-    return ave_loss.average(), mean_IoU, IoU_array
+    
+    return ave_loss.average()
 
 
 def testval(config, test_dataset, testloader, model,

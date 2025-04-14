@@ -34,7 +34,7 @@ def parse_args():
     
     parser.add_argument('--cfg',
                         help='experiment configure file name',
-                        default="/kaggle/input/configs/FaceManipulationDetection/AttGAN/ds_base_attgan.yaml",
+                        default="/kaggle/working/DSNet-FaceManipulationSegmentation/configs/FaceManipulationDetection/AttGAN/ds_base_attgan.yaml",
                         type=str)
     parser.add_argument('--seed', type=int, default=304)    
     parser.add_argument("--local_rank", type=int, default=-1)       
