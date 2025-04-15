@@ -78,6 +78,7 @@ class FaceManipulationDataset(data.Dataset):
     def get_transform(self, split):
         if split == 'train':
             return transforms.Compose([
+                transforms.ToPILImage(), # Convert to PIL Image for augmentation
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomRotation(10),
                 transforms.ColorJitter(brightness=0.2, contrast=0.2),
@@ -86,8 +87,8 @@ class FaceManipulationDataset(data.Dataset):
             ])
         else:
             return transforms.Compose([
-                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ToTensor()
+                ToTensor(),
+                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
             ])
     
     def __len__(self):
@@ -116,9 +117,8 @@ class FaceManipulationDataset(data.Dataset):
         
         # Apply transformations
         if self.transform:
-            sample = {'image': image, 'mask': mask}
-            sample = self.transform(sample)
-            image, mask = sample['image'], sample['mask']
+            image = self.transform(image)
+            mask = self.transform(mask)
         
         # Convert mask to tensor if not already
         if isinstance(mask, np.ndarray):
