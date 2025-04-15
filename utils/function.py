@@ -31,7 +31,7 @@ def reduce_tensor(inp):
     return reduced_inp / world_size
 
 def train(config, epoch, num_epoch, epoch_iters, base_lr,
-          num_iters, trainloader, optimizer, model, writer_dict, rank):
+          num_iters, trainloader, optimizer, model, writer_dict):
     # Training
     model.train()
 
