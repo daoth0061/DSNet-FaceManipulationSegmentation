@@ -15,6 +15,7 @@ class FaceManipulationDataset(data.Dataset):
     def __init__(self, fake_dir, real_dir, mask_dir, high_quality_images_path = None, split='train'):
         self.split = split
         self.transform = self.get_transform(split)
+        self.transform_mask = self.get_transform_mask()
         
         # Get all image paths
         self.samples = []
@@ -90,6 +91,14 @@ class FaceManipulationDataset(data.Dataset):
                 ToTensor(),
                 Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
             ])
+    def get_transform_mask(self):
+        return transforms.Compose([
+            transforms.ToPILImage(), # Convert to PIL Image for augmentation
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(10),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2),
+            ToTensor(),
+        ])
     
     def __len__(self):
         return len(self.samples)
@@ -118,7 +127,7 @@ class FaceManipulationDataset(data.Dataset):
         # Apply transformations
         if self.transform:
             image = self.transform(image)
-            mask = self.transform(mask)
+            mask = self.transform_mask(mask)
         
         # Convert mask to tensor if not already
         if isinstance(mask, np.ndarray):
