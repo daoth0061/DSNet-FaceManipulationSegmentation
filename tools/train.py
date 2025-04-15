@@ -147,10 +147,22 @@ def main():
     train_size = int(0.7 * len(full_dataset))
     val_size = int(0.15 * len(full_dataset))
     test_size = len(full_dataset) - train_size - val_size
-    
-    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
-        full_dataset, [train_size, val_size, test_size]
-    )
+
+    # Get indices for the split
+    indices = torch.randperm(len(full_dataset)).tolist()
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:train_size + val_size]
+    test_indices = indices[train_size + val_size:]
+
+    # Save test indices to a file
+    with open('test_indices.txt', 'w') as f:
+        for idx in test_indices:
+            f.write(f"{idx}\n")
+
+    # Create subsets using the indices
+    train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
+    # test_dataset = torch.utils.data.Subset(full_dataset, test_indices)
 
     train_sampler = get_sampler(train_dataset)
 
@@ -173,15 +185,15 @@ def main():
         pin_memory=True,
         sampler=val_sampler)
 
-    test_sampler = get_sampler(test_dataset)
+    # test_sampler = get_sampler(test_dataset)
 
-    testloader = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
-        shuffle=False,
-        num_workers=config.WORKERS,
-        pin_memory=True,
-        sampler=test_sampler)
+    # testloader = torch.utils.data.DataLoader(
+    #     test_dataset,
+    #     batch_size=config.TEST.BATCH_SIZE_PER_GPU,
+    #     shuffle=False,
+    #     num_workers=config.WORKERS,
+    #     pin_memory=True,
+    #     sampler=test_sampler)
     
 
 
@@ -252,7 +264,7 @@ def main():
         # Validation check at specified intervals
         if flag_rm == 1 or (epoch % 2 == 0 and epoch <= 50) or (epoch % 20 == 0 and epoch > 50 and epoch <= 180) or (epoch > 180 and epoch % 2 == 0) or (epoch > 235): 
             # Modify validate function to return only BCE loss, not mIoU
-            valid_loss = validate(config, testloader, model, writer_dict)
+            valid_loss = validate(config, valloader, model, writer_dict)
 
         if flag_rm == 1:
             flag_rm = 0

@@ -3,7 +3,7 @@ CUDNN:
   DETERMINISTIC: false
   ENABLED: true
 GPUS: (0,1)
-OUTPUT_DIR: '/kaggle/working/output'
+OUTPUT_DIR: '/kaggle/working/output_attgan'
 LOG_DIR: '/kaggle/working/log'
 WORKERS: 2
 PRINT_FREQ: 25
