@@ -20,13 +20,13 @@ TRAIN:
   - 256
   - 256
   BASE_SIZE: 256
-  BATCH_SIZE_PER_GPU: 8
+  BATCH_SIZE_PER_GPU: 16
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 253
   RESUME: false
   OPTIMIZER: Adam
-  LR: 1e-4
+  LR: 5e-4
   WD: 5e-4
   # FLIP: true
   # MULTI_SCALE: true
@@ -37,7 +37,7 @@ TEST:
   - 256
   - 256
   BASE_SIZE: 256
-  BATCH_SIZE_PER_GPU: 4
+  BATCH_SIZE_PER_GPU: 16
   FLIP_TEST: false
   MULTI_SCALE: false 
   MODEL_FILE: ''
