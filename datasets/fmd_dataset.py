@@ -82,8 +82,8 @@ class FaceManipulationDataset(data.Dataset):
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomRotation(10),
                 transforms.ColorJitter(brightness=0.2, contrast=0.2),
-                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ToTensor()
+                ToTensor(),
+                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
         else:
             return transforms.Compose([
