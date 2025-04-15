@@ -112,7 +112,9 @@ def main():
 
     print(final_output_dir)
     if distributed and args.local_rank == 0:
-        this_dir = os.path.dirname(os.getcwd())
+        # this_dir = os.path.dirname(os.getcwd())
+        this_dir = '/kaggle/working/DSNet-FaceManipulationSegmentation/tools'
+        print(f"this_dir: {this_dir}")
         models_dst_dir = os.path.join(final_output_dir, 'models')
         if os.path.exists(models_dst_dir):
             shutil.rmtree(models_dst_dir)
@@ -213,7 +215,6 @@ def main():
     epoch_iters = np.int64(len(train_dataset) / config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
     
     best_loss = float('inf')  # Track best loss instead of mIoU
-    mean_loss = 0
     last_epoch = config.TRAIN.BEGIN_EPOCH
     valid_loss = 0
     flag_rm = config.TRAIN.RESUME
