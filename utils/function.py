@@ -188,12 +188,12 @@ def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
             logging.info(msg)
 
 
-def validate_subprocess(config, testloader, model):
+def validate_subprocess(config, valloader, model):
     model.eval()
     ave_loss = AverageMeter()
     
     with torch.no_grad():
-        for idx, batch in enumerate(testloader):
+        for idx, batch in enumerate(valloader):
             images, masks = batch['image'], batch['mask']
             images = images.cuda()
             masks = masks.float().cuda()  # Ensure mask is float for BCE loss
