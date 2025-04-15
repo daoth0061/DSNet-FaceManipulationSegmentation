@@ -65,6 +65,7 @@ def main():
     #Fix seed
     args = parse_args()
     # torch.autograd.set_detect_anomaly(True)
+    print(f"I am process {args.local_rank}.")
     if args.seed > 0:
         import random
         print('Seeding with', args.seed)
@@ -72,17 +73,18 @@ def main():
         torch.manual_seed(args.seed)        
 
     #Set up log
-    logger, final_output_dir, tb_log_dir = create_logger(
-        config, args.cfg, 'dsnet_m')
+    if args.local_rank <= 0:
+        logger, final_output_dir, tb_log_dir = create_logger(
+            config, args.cfg, 'dsnet_m')
 
-    logger.info(pprint.pformat(args))
-    logger.info(config)
-    print(tb_log_dir)
-    writer_dict = {
-        'writer': SummaryWriter(tb_log_dir),
-        'train_global_steps': 0,
-        'valid_global_steps': 0,
-    }
+        logger.info(pprint.pformat(args))
+        logger.info(config)
+        print(tb_log_dir)
+        writer_dict = {
+            'writer': SummaryWriter(tb_log_dir),
+            'train_global_steps': 0,
+            'valid_global_steps': 0,
+        }
 
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
@@ -110,8 +112,9 @@ def main():
         )  
         # return 0
 
-    print(final_output_dir)
+    
     if distributed and args.local_rank == 0:
+        print(final_output_dir)
         # this_dir = os.path.dirname(os.getcwd())
         this_dir = '/kaggle/working/DSNet-FaceManipulationSegmentation/tools'
         print(f"this_dir: {this_dir}")
@@ -241,7 +244,8 @@ def main():
             
             model.module.model.load_state_dict({k.replace('model.', ''): v for k, v in dct.items() if k.startswith('model.')})
             optimizer.load_state_dict(checkpoint['optimizer'])
-            logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
+            if args.local_rank <= 0:
+                logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
         if distributed:
             torch.distributed.barrier()
 
