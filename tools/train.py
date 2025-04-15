@@ -23,7 +23,7 @@ import datasets
 from configs import config
 from configs import update_config
 from utils.criterion import CrossEntropy, OhemCrossEntropy, BondaryLoss
-from utils.function import train, validate
+from utils.function import train, validate, train_subprocess, validate_subprocess
 from utils.utils import create_logger, FullModel
 from torch.autograd import Variable
 from torch.utils.data.distributed import DistributedSampler
@@ -158,9 +158,10 @@ def main():
     test_indices = indices[train_size + val_size:]
 
     # Save test indices to a file
-    with open('test_indices.txt', 'w') as f:
-        for idx in test_indices:
-            f.write(f"{idx}\n")
+    if args.local_rank <= 0:
+        with open('test_indices.txt', 'w') as f:
+            for idx in test_indices:
+                f.write(f"{idx}\n")
 
     # Create subsets using the indices
     train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
@@ -259,16 +260,25 @@ def main():
         current_trainloader = trainloader
         if current_trainloader.sampler is not None and hasattr(current_trainloader.sampler, 'set_epoch'):
             current_trainloader.sampler.set_epoch(epoch)
-
-        # Call existing train function, assuming it now properly calculates BCE loss
-        train(config, epoch, config.TRAIN.END_EPOCH, 
-                epoch_iters, base_lr, num_iters,
-                trainloader, optimizer, model, writer_dict)
+        if args.local_rank <= 0:
+            # Call existing train function, assuming it now properly calculates BCE loss
+            train(config, epoch, config.TRAIN.END_EPOCH, 
+                    epoch_iters, base_lr, num_iters,
+                    trainloader, optimizer, model, writer_dict)
+        else:
+            # Call subprocess for distributed training
+            train_subprocess(config, epoch, config.TRAIN.END_EPOCH, 
+                    epoch_iters, base_lr, num_iters,
+                    trainloader, optimizer, model)
 
         # Validation check at specified intervals
         if flag_rm == 1 or (epoch % 2 == 0 and epoch <= 50) or (epoch % 20 == 0 and epoch > 50 and epoch <= 180) or (epoch > 180 and epoch % 2 == 0) or (epoch > 235): 
             # Modify validate function to return only BCE loss, not mIoU
-            valid_loss = validate(config, valloader, model, writer_dict)
+            if args.local_rank <= 0:
+                valid_loss = validate(config, valloader, model, writer_dict)
+            else:
+                # Call subprocess for distributed validation
+                valid_loss = validate_subprocess(config, valloader, model)
 
         if flag_rm == 1:
             flag_rm = 0

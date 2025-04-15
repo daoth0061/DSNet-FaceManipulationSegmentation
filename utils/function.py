@@ -31,7 +31,7 @@ def reduce_tensor(inp):
     return reduced_inp / world_size
 
 def train(config, epoch, num_epoch, epoch_iters, base_lr,
-          num_iters, trainloader, optimizer, model, writer_dict):
+          num_iters, trainloader, optimizer, model, writer_dict, rank):
     # Training
     model.train()
 
@@ -128,6 +128,91 @@ def validate(config, testloader, model, writer_dict):
     
     return ave_loss.average()
 
+def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
+          num_iters, trainloader, optimizer, model):
+    # Training
+    model.train()
+
+    batch_time = AverageMeter()
+    ave_loss = AverageMeter()
+    avg_bce_loss = AverageMeter()  # Add this for BCE loss tracking
+
+    tic = time.time()
+    cur_iters = epoch*epoch_iters
+
+    for i_iter, batch in enumerate(trainloader):
+        # For face manipulation data, we expect images and masks
+        images, masks = batch['image'], batch['mask']  # Modified to get mask instead of labels
+        images = images.cuda()
+        masks = masks.float().cuda()  # Ensure masks are float for BCE loss
+        
+        # Forward pass to get probability outputs
+        outputs = model(images)
+        
+        # Apply sigmoid to get probabilities in [0,1] range
+        outputs = torch.sigmoid(outputs)
+        
+        # Calculate BCE loss
+        loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+        
+        if dist.is_distributed():
+            reduced_loss = reduce_tensor(loss)
+        else:
+            reduced_loss = loss
+
+        # Backward and optimize
+        model.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        # Measure elapsed time
+        batch_time.update(time.time() - tic)
+        tic = time.time()
+
+        # Update average loss
+        avg_bce_loss.update(reduced_loss.item())
+
+        # Adjust learning rate
+        lr = adjust_learning_rate(optimizer,
+                              base_lr,
+                              num_iters,
+                              i_iter+cur_iters)
+                              
+        # Print progress
+        if i_iter % config.PRINT_FREQ == 0 and dist.get_rank() == 0:
+            msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
+                  'lr: {}, BCE Loss: {:.6f}' .format(
+                      epoch, num_epoch, i_iter, epoch_iters,
+                      batch_time.average(), [x['lr'] for x in optimizer.param_groups], 
+                      avg_bce_loss.average())
+            logging.info(msg)
+
+
+def validate_subprocess(config, testloader, model):
+    model.eval()
+    ave_loss = AverageMeter()
+    
+    with torch.no_grad():
+        for idx, batch in enumerate(testloader):
+            images, masks = batch['image'], batch['mask']
+            images = images.cuda()
+            masks = masks.float().cuda()  # Ensure mask is float for BCE loss
+            
+            # Forward pass
+            outputs = model(images)
+            outputs = torch.sigmoid(outputs)
+            
+            # Calculate BCE loss
+            loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+            
+            if dist.is_distributed():
+                reduced_loss = reduce_tensor(loss)
+            else:
+                reduced_loss = loss
+                
+            ave_loss.update(reduced_loss.item())
+    
+    return ave_loss.average()
 
 def testval(config, test_dataset, testloader, model,
             sv_dir='./', sv_pred=False):
