@@ -132,14 +132,14 @@ def main():
     fake_dir = '/kaggle/input/dataset-attrgan/fake_attrGAN/fake_attrGAN'
     real_dir = '/kaggle/input/dataset-attrgan/real-20250326T031740Z-001/real'
     mask_dir = '/kaggle/input/masked-dataset-newversion/mask'
-    filtered_images_path = '/kaggle/input/attgan-filtering/evaluation_results/images_threshold_0.95.txt'
+    high_quality_images_path = '/kaggle/input/attgan-filtering/evaluation_results/images_threshold_0.95.txt'
     
     # Create datasets
     full_dataset = eval('datasets.'+config.DATASET.DATASET)(
         fake_dir=fake_dir,
         real_dir=real_dir,
         mask_dir=mask_dir,
-        filtered_images_path=filtered_images_path,
+        high_quality_images_path=high_quality_images_path,
         split='train'
     )
 
