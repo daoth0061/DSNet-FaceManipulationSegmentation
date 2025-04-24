@@ -22,7 +22,7 @@ import models
 import datasets
 from configs import config
 from configs import update_config
-from utils.criterion import CrossEntropy, OhemCrossEntropy, BondaryLoss
+# from utils.criterion import CrossEntropy, OhemCrossEntropy, BondaryLoss
 from utils.function import train, validate, train_subprocess, validate_subprocess
 from utils.utils import create_logger, FullModel
 from torch.autograd import Variable
@@ -230,7 +230,7 @@ def main():
 
     epoch_iters = np.int64(len(train_dataset) / config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
     
-    best_loss = float('inf')  # Track best loss instead of mIoU
+    best_loss = float('inf')  # Track best L1 loss instead of mIoU
     last_epoch = config.TRAIN.BEGIN_EPOCH
     valid_loss = 0
     flag_rm = config.TRAIN.RESUME

@@ -37,7 +37,7 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
 
     batch_time = AverageMeter()
     ave_loss = AverageMeter()
-    avg_bce_loss = AverageMeter()  # Add this for BCE loss tracking
+    avg_l1_loss = AverageMeter()  # Add this for L1 loss tracking
 
     tic = time.time()
     cur_iters = epoch*epoch_iters
@@ -48,7 +48,7 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
         # For face manipulation data, we expect images and masks
         images, masks = batch['image'], batch['mask']  # Modified to get mask instead of labels
         images = images.cuda()
-        masks = masks.float().cuda()  # Ensure masks are float for BCE loss
+        masks = masks.float().cuda()  # Ensure masks are float for L1 loss
         
         # Forward pass to get probability outputs
         outputs = model(images)
@@ -56,8 +56,8 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
         # Apply sigmoid to get probabilities in [0,1] range
         outputs = torch.sigmoid(outputs)
         
-        # Calculate BCE loss
-        loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+        # Calculate L1 loss
+        loss = F.l1_loss(outputs, masks, reduction='mean')
         
         if dist.is_distributed():
             reduced_loss = reduce_tensor(loss)
@@ -74,7 +74,7 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
         tic = time.time()
 
         # Update average loss
-        avg_bce_loss.update(reduced_loss.item())
+        avg_l1_loss.update(reduced_loss.item())
 
         # Adjust learning rate
         lr = adjust_learning_rate(optimizer,
@@ -85,14 +85,14 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
         # Print progress
         if i_iter % config.PRINT_FREQ == 0 and dist.get_rank() == 0:
             msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
-                  'lr: {}, BCE Loss: {:.6f}' .format(
+                  'lr: {}, L1 Loss: {:.6f}' .format(
                       epoch, num_epoch, i_iter, epoch_iters,
                       batch_time.average(), [x['lr'] for x in optimizer.param_groups], 
-                      avg_bce_loss.average())
+                      avg_l1_loss.average())
             logging.info(msg)
 
     # Log to tensorboard
-    writer.add_scalar('train_bce_loss', avg_bce_loss.average(), global_steps)
+    writer.add_scalar('train_l1_loss', avg_l1_loss.average(), global_steps)
     writer_dict['train_global_steps'] = global_steps + 1
 
 
@@ -104,14 +104,14 @@ def validate(config, testloader, model, writer_dict):
         for idx, batch in enumerate(testloader):
             images, masks = batch['image'], batch['mask']
             images = images.cuda()
-            masks = masks.float().cuda()  # Ensure mask is float for BCE loss
+            masks = masks.float().cuda()  # Ensure mask is float for L1 loss
             
             # Forward pass
             outputs = model(images)
             outputs = torch.sigmoid(outputs)
             
-            # Calculate BCE loss
-            loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+            # Calculate L1 loss
+            loss = F.l1_loss(outputs, masks, reduction='mean')
             
             if dist.is_distributed():
                 reduced_loss = reduce_tensor(loss)
@@ -123,7 +123,7 @@ def validate(config, testloader, model, writer_dict):
     # Log to tensorboard
     writer = writer_dict['writer']
     global_steps = writer_dict['valid_global_steps']
-    writer.add_scalar('valid_bce_loss', ave_loss.average(), global_steps)
+    writer.add_scalar('valid_l1_loss', ave_loss.average(), global_steps)
     writer_dict['valid_global_steps'] = global_steps + 1
     
     return ave_loss.average()
@@ -135,7 +135,7 @@ def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
 
     batch_time = AverageMeter()
     ave_loss = AverageMeter()
-    avg_bce_loss = AverageMeter()  # Add this for BCE loss tracking
+    avg_l1_loss = AverageMeter()  # Add this for L1 loss tracking
 
     tic = time.time()
     cur_iters = epoch*epoch_iters
@@ -144,7 +144,7 @@ def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
         # For face manipulation data, we expect images and masks
         images, masks = batch['image'], batch['mask']  # Modified to get mask instead of labels
         images = images.cuda()
-        masks = masks.float().cuda()  # Ensure masks are float for BCE loss
+        masks = masks.float().cuda()  # Ensure masks are float for L1 loss
         
         # Forward pass to get probability outputs
         outputs = model(images)
@@ -152,8 +152,8 @@ def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
         # Apply sigmoid to get probabilities in [0,1] range
         outputs = torch.sigmoid(outputs)
         
-        # Calculate BCE loss
-        loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+        # Calculate L1 loss
+        loss = F.l1_loss(outputs, masks, reduction='mean')
         
         if dist.is_distributed():
             reduced_loss = reduce_tensor(loss)
@@ -170,7 +170,7 @@ def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
         tic = time.time()
 
         # Update average loss
-        avg_bce_loss.update(reduced_loss.item())
+        avg_l1_loss.update(reduced_loss.item())
 
         # Adjust learning rate
         lr = adjust_learning_rate(optimizer,
@@ -181,10 +181,10 @@ def train_subprocess(config, epoch, num_epoch, epoch_iters, base_lr,
         # Print progress
         if i_iter % config.PRINT_FREQ == 0 and dist.get_rank() == 0:
             msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
-                  'lr: {}, BCE Loss: {:.6f}' .format(
+                  'lr: {}, L1 Loss: {:.6f}' .format(
                       epoch, num_epoch, i_iter, epoch_iters,
                       batch_time.average(), [x['lr'] for x in optimizer.param_groups], 
-                      avg_bce_loss.average())
+                      avg_l1_loss.average())
             logging.info(msg)
 
 
@@ -196,14 +196,14 @@ def validate_subprocess(config, valloader, model):
         for idx, batch in enumerate(valloader):
             images, masks = batch['image'], batch['mask']
             images = images.cuda()
-            masks = masks.float().cuda()  # Ensure mask is float for BCE loss
+            masks = masks.float().cuda()  # Ensure mask is float for L1 loss
             
             # Forward pass
             outputs = model(images)
             outputs = torch.sigmoid(outputs)
             
-            # Calculate BCE loss
-            loss = F.binary_cross_entropy(outputs, masks, reduction='mean')
+            # Calculate L1 loss
+            loss = F.l1_loss(outputs, masks, reduction='mean')
             
             if dist.is_distributed():
                 reduced_loss = reduce_tensor(loss)
@@ -214,82 +214,82 @@ def validate_subprocess(config, valloader, model):
     
     return ave_loss.average()
 
-def testval(config, test_dataset, testloader, model,
-            sv_dir='./', sv_pred=False):
-    model.eval()
-    confusion_matrix = np.zeros((config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES))
-    with torch.no_grad():
-        for index, batch in enumerate(tqdm(testloader)):
-            image, label, _, name = batch
-            size = label.size()
-            pred = test_dataset.single_scale_inference(config, model, image.cuda())
+# def testval(config, test_dataset, testloader, model,
+#             sv_dir='./', sv_pred=False):
+#     model.eval()
+#     confusion_matrix = np.zeros((config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES))
+#     with torch.no_grad():
+#         for index, batch in enumerate(tqdm(testloader)):
+#             image, label, _, name = batch
+#             size = label.size()
+#             pred = test_dataset.single_scale_inference(config, model, image.cuda())
 
-            if pred.size()[-2] != size[-2] or pred.size()[-1] != size[-1]:
-                pred = F.interpolate(
-                    pred, size[-2:],
-                    mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS
-                )
+#             if pred.size()[-2] != size[-2] or pred.size()[-1] != size[-1]:
+#                 pred = F.interpolate(
+#                     pred, size[-2:],
+#                     mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS
+#                 )
             
-            confusion_matrix += get_confusion_matrix(
-                label,
-                pred,
-                size,
-                config.DATASET.NUM_CLASSES,
-                config.TRAIN.IGNORE_LABEL)
+#             confusion_matrix += get_confusion_matrix(
+#                 label,
+#                 pred,
+#                 size,
+#                 config.DATASET.NUM_CLASSES,
+#                 config.TRAIN.IGNORE_LABEL)
 
-            if sv_pred:
-                sv_path = os.path.join(sv_dir, 'val_results')
-                if not os.path.exists(sv_path):
-                    os.mkdir(sv_path)
-                test_dataset.save_pred(pred, sv_path, name)
+#             if sv_pred:
+#                 sv_path = os.path.join(sv_dir, 'val_results')
+#                 if not os.path.exists(sv_path):
+#                     os.mkdir(sv_path)
+#                 test_dataset.save_pred(pred, sv_path, name)
 
-            pos = confusion_matrix.sum(1)
-            res = confusion_matrix.sum(0)
-            tp = np.diag(confusion_matrix)
-            IoU_array = (tp / np.maximum(1.0, pos + res - tp))
-            mean_IoU = IoU_array.mean()
+#             pos = confusion_matrix.sum(1)
+#             res = confusion_matrix.sum(0)
+#             tp = np.diag(confusion_matrix)
+#             IoU_array = (tp / np.maximum(1.0, pos + res - tp))
+#             mean_IoU = IoU_array.mean()
 
-            if index % 100 == 0:
-                logging.info('processing: %d images' % index)
-                pos = confusion_matrix.sum(1)
-                res = confusion_matrix.sum(0)
-                tp = np.diag(confusion_matrix)
-                IoU_array = (tp / np.maximum(1.0, pos + res - tp))
-                mean_IoU = IoU_array.mean()
-                logging.info('mIoU: %.4f' % (mean_IoU))
-                logging.info(IoU_array)
+#             if index % 100 == 0:
+#                 logging.info('processing: %d images' % index)
+#                 pos = confusion_matrix.sum(1)
+#                 res = confusion_matrix.sum(0)
+#                 tp = np.diag(confusion_matrix)
+#                 IoU_array = (tp / np.maximum(1.0, pos + res - tp))
+#                 mean_IoU = IoU_array.mean()
+#                 logging.info('mIoU: %.4f' % (mean_IoU))
+#                 logging.info(IoU_array)
 
-    pos = confusion_matrix.sum(1)
-    res = confusion_matrix.sum(0)
-    tp = np.diag(confusion_matrix)
-    pixel_acc = tp.sum()/pos.sum()
-    mean_acc = (tp/np.maximum(1.0, pos)).mean()
-    IoU_array = (tp / np.maximum(1.0, pos + res - tp))
-    mean_IoU = IoU_array.mean()
+#     pos = confusion_matrix.sum(1)
+#     res = confusion_matrix.sum(0)
+#     tp = np.diag(confusion_matrix)
+#     pixel_acc = tp.sum()/pos.sum()
+#     mean_acc = (tp/np.maximum(1.0, pos)).mean()
+#     IoU_array = (tp / np.maximum(1.0, pos + res - tp))
+#     mean_IoU = IoU_array.mean()
 
-    return mean_IoU, IoU_array, pixel_acc, mean_acc
+#     return mean_IoU, IoU_array, pixel_acc, mean_acc
 
 
-def test(config, test_dataset, testloader, model,
-         sv_dir='./', sv_pred=True):
-    model.eval()
-    with torch.no_grad():
-        for _, batch in enumerate(tqdm(testloader)):
-            image, size, name = batch
-            size = size[0]
-            pred = test_dataset.single_scale_inference(
-                config,
-                model,
-                image.cuda())
+# def test(config, test_dataset, testloader, model,
+#          sv_dir='./', sv_pred=True):
+#     model.eval()
+#     with torch.no_grad():
+#         for _, batch in enumerate(tqdm(testloader)):
+#             image, size, name = batch
+#             size = size[0]
+#             pred = test_dataset.single_scale_inference(
+#                 config,
+#                 model,
+#                 image.cuda())
 
-            if pred.size()[-2] != size[0] or pred.size()[-1] != size[1]:
-                pred = F.interpolate(
-                    pred, size[-2:],
-                    mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS
-                )
+#             if pred.size()[-2] != size[0] or pred.size()[-1] != size[1]:
+#                 pred = F.interpolate(
+#                     pred, size[-2:],
+#                     mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS
+#                 )
                 
-            if sv_pred:
-                sv_path = os.path.join(sv_dir,'test_results')
-                if not os.path.exists(sv_path):
-                    os.mkdir(sv_path)
-                test_dataset.save_pred(pred, sv_path, name)
+#             if sv_pred:
+#                 sv_path = os.path.join(sv_dir,'test_results')
+#                 if not os.path.exists(sv_path):
+#                     os.mkdir(sv_path)
+#                 test_dataset.save_pred(pred, sv_path, name)
