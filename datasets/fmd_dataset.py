@@ -80,8 +80,6 @@ class FaceManipulationDataset(data.Dataset):
         if split == 'train':
             return transforms.Compose([
                 transforms.ToPILImage(), # Convert to PIL Image for augmentation
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomRotation(10),
                 transforms.ColorJitter(brightness=0.2, contrast=0.2),
                 ToTensor(),
                 Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -94,8 +92,6 @@ class FaceManipulationDataset(data.Dataset):
     def get_transform_mask(self):
         return transforms.Compose([
             transforms.ToPILImage(), # Convert to PIL Image for augmentation
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(10),
             transforms.ColorJitter(brightness=0.2, contrast=0.2),
             ToTensor(),
         ])
