@@ -20,59 +20,61 @@ class FaceManipulationDataset(data.Dataset):
         # Get all image paths
         self.samples = []
         
-        # Add real images (all have _0 suffix and no mask)
-        real_images = sorted(glob.glob(os.path.join(real_dir, '*_0.*')))
-        for img_path in real_images:
-            img_name = os.path.basename(img_path)
-            self.samples.append({
-                'image': img_path,
-                'mask': None,  # Real images have no mask (all zeros)
-                'label': 0,    # Real = 0
-                'is_real': True
-            })
+        if real_dir:
+            # Add real images (all have _0 suffix and no mask)
+            real_images = sorted(glob.glob(os.path.join(real_dir, '*_0.*')))
+            for img_path in real_images:
+                img_name = os.path.basename(img_path)
+                self.samples.append({
+                    'image': img_path,
+                    'mask': None,  # Real images have no mask (all zeros)
+                    'label': 0,    # Real = 0
+                    'is_real': True
+                })
         
-        # Load high_quality image list
-        if high_quality_images_path:
-            with open(high_quality_images_path, 'r') as f:
-                self.high_quality_images = set(line.strip() for line in f.readlines())
-        else:
-            self.high_quality_images = set()
-        
-        # Add fake images (with corresponding masks)
-        fake_images = sorted(glob.glob(os.path.join(fake_dir, '*.*')))
-        for img_path in fake_images:
-            img_name = os.path.basename(img_path)
-            # Skip low-quality fake images
-            if img_name not in self.high_quality_images:
-                continue
-
-            # Get name without extension
-            name_without_ext = os.path.splitext(img_name)[0]
-
-            # Find corresponding mask (check for both jpg and png)
-            mask_jpg = os.path.join(mask_dir, f"{name_without_ext}.jpg")
-            mask_png = os.path.join(mask_dir, f"{name_without_ext}.png")
-            
-            if os.path.exists(mask_jpg):
-                mask_path = mask_jpg
-            elif os.path.exists(mask_png):
-                mask_path = mask_png
+        if fake_dir:
+            # Load high_quality image list
+            if high_quality_images_path:
+                with open(high_quality_images_path, 'r') as f:
+                    self.high_quality_images = set(line.strip() for line in f.readlines())
             else:
-                # If no mask found, log the image path and continue
-                # Get the current frame and line number for logging
-                frame = inspect.currentframe()
-                file_name = os.path.basename(inspect.getfile(frame))
-                line_number = frame.f_lineno
+                self.high_quality_images = set()
 
-                print(f"[WARN] Mask not found for: {img_path} (at {file_name}:{line_number})")
-                continue
+            # Add fake images (with corresponding masks)
+            fake_images = sorted(glob.glob(os.path.join(fake_dir, '*.*')))
+            for img_path in fake_images:
+                img_name = os.path.basename(img_path)
+                # Skip low-quality fake images
+                if img_name not in self.high_quality_images:
+                    continue
+
+                # Get name without extension
+                name_without_ext = os.path.splitext(img_name)[0]
+
+                # Find corresponding mask (check for both jpg and png)
+                mask_jpg = os.path.join(mask_dir, f"{name_without_ext}.jpg")
+                mask_png = os.path.join(mask_dir, f"{name_without_ext}.png")
                 
-            self.samples.append({
-                'image': img_path,
-                'mask': mask_path,
-                'label': 1,    # Fake = 1
-                'is_real': False
-            })
+                if os.path.exists(mask_jpg):
+                    mask_path = mask_jpg
+                elif os.path.exists(mask_png):
+                    mask_path = mask_png
+                else:
+                    # If no mask found, log the image path and continue
+                    # Get the current frame and line number for logging
+                    frame = inspect.currentframe()
+                    file_name = os.path.basename(inspect.getfile(frame))
+                    line_number = frame.f_lineno
+
+                    print(f"[WARN] Mask not found for: {img_path} (at {file_name}:{line_number})")
+                    continue
+                    
+                self.samples.append({
+                    'image': img_path,
+                    'mask': mask_path,
+                    'label': 1,    # Fake = 1
+                    'is_real': False
+                })
         
         print(f"[{split}] Loaded {len(self.samples)} samples: {sum(1 for s in self.samples if s['is_real'])} real, {sum(1 for s in self.samples if not s['is_real'])} fake")
     
