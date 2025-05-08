@@ -12,7 +12,7 @@ import os
 import inspect
 # Create dataset class for face manipulation detection
 class FaceManipulationDataset(data.Dataset):
-    def __init__(self, fake_dir, real_dir, mask_dir, high_quality_images_path = None, split='train'):
+    def __init__(self, fake_dir = None, real_dir = None, mask_dir = None, high_quality_images_path = None, split='train'):
         self.split = split
         self.transform = self.get_transform(split)
         self.transform_mask = self.get_transform_mask()
