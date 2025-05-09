@@ -335,9 +335,9 @@ def main():
         # Validation check at specified intervals or on the last epoch of phase 1
         if flag_rm == 1 or (epoch % 2 == 0) or (epoch == phase1_epochs - 1): 
             if args.local_rank <= 0:
-                valid_loss = validate(config, real_valloader, model, writer_dict, phase=1)
+                valid_loss = validate(config, real_valloader, model, writer_dict)
             else:
-                valid_loss = validate_subprocess(config, real_valloader, model, phase=1)
+                valid_loss = validate_subprocess(config, real_valloader, model)
 
         if flag_rm == 1:
             flag_rm = 0
@@ -399,9 +399,9 @@ def main():
         (relative_epoch > 180 and relative_epoch % 2 == 0) or \
         (relative_epoch > 235) or (relative_epoch == phase2_epochs - 1): 
             if args.local_rank <= 0:
-                valid_loss = validate(config, combined_valloader, model, writer_dict, phase=2)
+                valid_loss = validate(config, combined_valloader, model, writer_dict)
             else:
-                valid_loss = validate_subprocess(config, combined_valloader, model, phase=2)
+                valid_loss = validate_subprocess(config, combined_valloader, model)
         
         # Save checkpoint
         if args.local_rank <= 0:
