@@ -364,10 +364,6 @@ def main():
                         0.0, valid_loss, best_loss)
             logging.info(msg)
     
-    # Reset best loss for Phase 2
-    phase1_best_model = None
-    if os.path.exists(os.path.join(final_output_dir, 'best_dsnet_face_phase1.pth')):
-        phase1_best_model = torch.load(os.path.join(final_output_dir, 'best_dsnet_face_phase1.pth'))
 
     # Phase 2: Train on fake images only, validate on combined
     phase2_best_loss = float('inf')
